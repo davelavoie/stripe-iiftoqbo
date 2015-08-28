@@ -8,7 +8,7 @@ module OFX
     attr_accessor :memo
 
     def trnamt=(amt)
-      @trnamt = (BigDecimal.new(amt) if amount)
+      @trnamt = (BigDecimal.new(amt) if amt)
     end
   end
 end
