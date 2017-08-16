@@ -126,8 +126,9 @@ module StripeIIFToQBO
           if @payments[charge_id]
             ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
           end
-
         when 'Stripe Account'
+          return nil
+        when 'Stripe Other Income'
           return nil
       end
       if ofx_entry[:amount] == BigDecimal.new(0)
