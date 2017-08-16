@@ -117,9 +117,8 @@ module StripeIIFToQBO
             ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
           end
         when 'Stripe Account'
-          ofx_entry[:amount] = -iif_entry.amount
-          ofx_entry[:name] = 'Account Transaction'
-          alt_entry = true
+          #unnecessary
+          return nil
         when 'Stripe Other Income'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = 'Other Income'
