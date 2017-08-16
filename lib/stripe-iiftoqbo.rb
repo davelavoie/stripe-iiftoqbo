@@ -16,8 +16,8 @@ module StripeIIFToQBO
       @output_file = options[:output_file] if options[:output_file]
       raise 'missing required iif file' if @iif_file.nil?
       raise 'missing required output file' if @output_file.nil?
-      # load_payments_file(@payments_file)
-      # load_transfers_file(@transfers_file)
+      load_payments_file(@payments_file)
+      load_transfers_file(@transfers_file)
       load_iif_file(@iif_file)
     end
 
