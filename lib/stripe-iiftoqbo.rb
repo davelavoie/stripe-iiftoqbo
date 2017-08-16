@@ -14,11 +14,12 @@ module StripeIIFToQBO
       @transfers_file = options[:transfers_file] if options[:transfers_file]
       @server_time = options[:server_time] || Date.today
       @output_file = options[:output_file] if options[:output_file]
+      @alt_entries = options[:alt_entries] if options[:alt_entries]
       raise 'missing required iif file' if @iif_file.nil?
       raise 'missing required output file' if @output_file.nil?
       load_payments_file(@payments_file)
       load_transfers_file(@transfers_file)
-      load_iif_file(@iif_file)
+      load_iif_file(@iif_file, @alt_entries)
     end
 
     def load_payments_file(payments_file)
@@ -41,7 +42,7 @@ module StripeIIFToQBO
       end
     end
 
-    def load_iif_file(iif_file)
+    def load_iif_file(iif_file, return_alt_entries = false)
       @ofx_entries = []
       file_count = 0
       if iif_file
@@ -49,7 +50,7 @@ module StripeIIFToQBO
           iif.transactions.each do |transaction|
             #process the transaction
             transaction.entries.each do |iif_entry|
-              ofx_entry = convert_iif_entry_to_ofx(iif_entry)
+              ofx_entry = convert_iif_entry_to_ofx(iif_entry, return_alt_entries)
               if ofx_entry
                 @ofx_entries.push(ofx_entry)
               end
@@ -67,39 +68,31 @@ module StripeIIFToQBO
       end
     end
 
-    def convert_iif_entry_to_ofx(iif_entry)
+    def convert_iif_entry_to_ofx(iif_entry, return_alt_entries = false)
       ofx_entry = {}
-
       ofx_entry[:date] = iif_entry.date
       ofx_entry[:fitid] = iif_entry.memo
       ofx_entry[:accnt] = iif_entry.accnt
       ofx_entry[:trnstype] = iif_entry.trnstype
       ofx_entry[:memo] = iif_entry.memo
-
+      alt_entry = false
       case iif_entry.accnt
-
         when 'Stripe Third-party Account'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = iif_entry.name
-
           ofx_entry[:memo] =~ /Transfer from Stripe: (\S+)/
           transfer_id = $1
-
           if @transfers[transfer_id]
             ofx_entry[:memo] = "#{@transfers[transfer_id]} #{iif_entry.memo}"
           end
-
         when 'Stripe Payment Processing Fees'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = 'Stripe'
-
         when 'Stripe Checking Account'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = "Transfer to #{iif_entry.accnt}"
-
         when 'Stripe Sales'
           ofx_entry[:amount] = -iif_entry.amount
-
           if iif_entry.memo =~ /Stripe Connect fee/
             ofx_entry[:name] = 'Stripe Connect Charge'
           elsif iif_entry.memo =~ /Charge/
@@ -107,15 +100,12 @@ module StripeIIFToQBO
           else
             ofx_entry[:name] = iif_entry.accnt
           end
-
           ofx_entry[:memo] =~ /Charge ID: (\S+)/
           charge_id = $1
-
           if @payments[charge_id]
             ofx_entry[:memo] = "#{@payments[charge_id]} Charge ID: #{charge_id}"
             ofx_entry[:fitid] = charge_id
           end
-
         when 'Stripe Returns'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = 'Credit Card Refund'
@@ -127,15 +117,31 @@ module StripeIIFToQBO
             ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
           end
         when 'Stripe Account'
-          return nil
+          ofx_entry[:amount] = -iif_entry.amount
+          ofx_entry[:name] = 'Account Transaction'
+          alt_entry = true
         when 'Stripe Other Income'
-          return nil
+          ofx_entry[:amount] = -iif_entry.amount
+          ofx_entry[:name] = 'Other Income'
+          alt_entry = true
       end
       if ofx_entry[:amount] == BigDecimal.new(0)
         #bail on zero amounts
         return nil
       end
-      return ofx_entry
+      if alt_entry
+        if return_alt_entries
+          return ofx_entry
+        else
+          return nil
+        end
+      else
+        if return_alt_entries
+          return nil
+        else
+          return ofx_entry
+        end
+      end
     end
 
     def to_csv
@@ -155,14 +161,12 @@ module StripeIIFToQBO
     def to_qbo
       min_date = nil
       max_date = nil
-
       @ofx_entries.each do |e|
         if e[:date]
           min_date = e[:date] if min_date.nil? or e[:date] < min_date
           max_date = e[:date] if max_date.nil? or e[:date] > max_date
         end
       end
-
       ofx_builder = OFX::Builder.new do |ofx|
         ofx.dtserver = @server_time
         ofx.fi_org = 'Stripe'
@@ -185,8 +189,8 @@ module StripeIIFToQBO
           ofx_tr.memo = ofx_entry[:memo]
         end
       end
-
       return ofx_builder.to_ofx
     end
+
   end
 end

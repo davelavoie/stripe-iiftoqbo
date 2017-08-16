@@ -1,19 +1,17 @@
 #!/usr/bin/env ruby
-
 require 'optparse'
 require 'bigdecimal'
 require 'csv'
 require 'pp'
-
 require 'stripe-iiftoqbo'
 
 account_id = nil
 iif_file = nil
 output_file = nil
 dump_csv = false
+alt_entries = false
 payments_file = nil
 transfers_file = nil
-
 optparser = OptionParser.new do |opts|
   executable_name = File.split($0)[1]
   opts.banner = <<-EOS
@@ -29,31 +27,28 @@ IIF_FILE     : the .iif file to convert (required)
 OUTPUT_FILE     : the filename for .qbo output, excluding file extension (required)
 
   EOS
-
   opts.on('-p', '--payments [PAYMENTS_CSV_FILE]', 'Populate .qbo charge memo using memo field from a Stripe Payments CSV export') do |filename|
     payments_file = filename
   end
-
   opts.on('-t', '--transfers [TRANSFERS_CSV_FILE]', 'Populate .qbo transfer memo using memo field from a Stripe Transfers CSV export') do |filename|
     transfers_file = filename
   end
-
   opts.on('-c', '--csv', 'Output CSV of transactions instead of QBO, for debugging and analysis') do
     dump_csv = true
   end
+  opts.on('-a', '--alt', 'Return alternate entries') do
+    alt_entries = true
+  end
 end
-
 optparser.parse!
-
 if ARGV.length < 3
   puts optparser
   exit(-1)
 end
-
 StripeIIFToQBO::Converter.new(:account_id => ARGV[0],
                               :iif_file => ARGV[1],
                               :output_file => ARGV[2],
                               :payments_file => payments_file,
-                              :transfers_file => transfers_file)
-
+                              :transfers_file => transfers_file,
+                              :alt_entries => alt_entries)
 puts 'done!'
