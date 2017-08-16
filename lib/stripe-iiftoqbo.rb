@@ -4,15 +4,20 @@ require_relative 'ofx'
 
 module StripeIIFToQBO
   class Converter
+
+    MAX_LINES = 900
+
     def initialize(options={})
       @account_id = options[:account_id] if options[:account_id]
       @iif_file = options[:iif_file] if options[:iif_file]
       @payments_file = options[:payments_file] if options[:payments_file]
       @transfers_file = options[:transfers_file] if options[:transfers_file]
       @server_time = options[:server_time] || Date.today
-
-      load_payments_file(@payments_file)
-      load_transfers_file(@transfers_file)
+      @output_file = options[:output_file] if options[:output_file]
+      raise 'missing required iif file' if @iif_file.nil?
+      raise 'missing required output file' if @output_file.nil?
+      # load_payments_file(@payments_file)
+      # load_transfers_file(@transfers_file)
       load_iif_file(@iif_file)
     end
 
@@ -38,18 +43,27 @@ module StripeIIFToQBO
 
     def load_iif_file(iif_file)
       @ofx_entries = []
-
+      file_count = 0
       if iif_file
         IIF(iif_file) do |iif|
           iif.transactions.each do |transaction|
+            #process the transaction
             transaction.entries.each do |iif_entry|
               ofx_entry = convert_iif_entry_to_ofx(iif_entry)
               if ofx_entry
                 @ofx_entries.push(ofx_entry)
               end
             end
+            #write file (if necessary)
+            if @ofx_entries.length == MAX_LINES
+              write_qbo_file(file_count)
+              file_count += 1
+              @ofx_entries = []
+            end
           end
         end
+        #write file (anything left)
+        write_qbo_file(file_count)
       end
     end
 
@@ -127,6 +141,11 @@ module StripeIIFToQBO
         rows.push([ofx_entry[:date].strftime('%m/%d/%Y'), ofx_entry[:name], ofx_entry[:accnt], "#{ofx_entry[:trnstype]} #{ofx_entry[:memo]}", ofx_entry[:amount].to_s('F')].to_csv)
       end
       return rows.join
+    end
+
+    def write_qbo_file(file_number)
+      file_name = "#{@output_file}_#{file_number}.qbo"
+      File.open(file_name, 'w') {|file| file.write to_qbo.to_s}
     end
 
     def to_qbo
