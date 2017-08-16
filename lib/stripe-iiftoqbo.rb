@@ -5,7 +5,7 @@ require_relative 'ofx'
 module StripeIIFToQBO
   class Converter
 
-    MAX_LINES = 900
+    MAX_LINES = 500
 
     def initialize(options={})
       @account_id = options[:account_id] if options[:account_id]
@@ -55,7 +55,7 @@ module StripeIIFToQBO
               end
             end
             #write file (if necessary)
-            if @ofx_entries.length == MAX_LINES
+            if @ofx_entries.length >= MAX_LINES
               write_qbo_file(file_count)
               file_count += 1
               @ofx_entries = []
