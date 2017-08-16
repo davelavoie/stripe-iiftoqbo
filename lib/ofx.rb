@@ -1,6 +1,6 @@
-require "nokogiri"
+require 'nokogiri'
 
-require "ofx/transaction"
+require 'ofx/transaction'
 
 module OFX
   class Builder
@@ -11,7 +11,7 @@ module OFX
 
     attr_accessor :bank_id
     attr_accessor :acct_id
-    attr_accessor :acct_type  # CHECKING, SAVINGS, MONEYMRKT, CREDITLINE
+    attr_accessor :acct_type # CHECKING, SAVINGS, MONEYMRKT, CREDITLINE
 
     attr_accessor :dtstart
     attr_accessor :dtend
@@ -23,16 +23,16 @@ module OFX
 
     def initialize(&block)
       @headers = [
-                  [ "OFXHEADER", "100" ],
-                  [ "DATA", "OFXSGML" ],
-                  [ "VERSION", "103" ],
-                  [ "SECURITY", "NONE" ],
-                  [ "ENCODING", "USASCII" ],
-                  [ "CHARSET", "1252" ],
-                  [ "COMPRESSION", "NONE" ],
-                  [ "OLDFILEUID", "NONE" ],
-                  [ "NEWFILEUID", "NONE" ]
-                 ]
+          ['OFXHEADER', '100'],
+          ['DATA', 'OFXSGML'],
+          ['VERSION', '103'],
+          ['SECURITY', 'NONE'],
+          ['ENCODING', 'USASCII'],
+          ['CHARSET', '1252'],
+          ['COMPRESSION', 'NONE'],
+          ['OLDFILEUID', 'NONE'],
+          ['NEWFILEUID', 'NONE']
+      ]
       @transactions = []
       self.dtserver = Date.today
       if block_given?
@@ -52,11 +52,11 @@ module OFX
 
     def to_ofx
       print_headers +
-        print_body
+          print_body
     end
 
     def print_headers
-      @headers.map { |key, value| "#{key}:#{value}" }.join("\n") + "\n\n" 
+      @headers.map {|key, value| "#{key}:#{value}"}.join("\n") + "\n\n"
     end
 
     def print_body
@@ -65,27 +65,27 @@ module OFX
           xml.SIGNONMSGSRSV1 {
             xml.SONRS {
               xml.STATUS {
-                xml.CODE "0"
-                xml.SEVERITY "INFO"
+                xml.CODE '0'
+                xml.SEVERITY 'INFO'
               }
               xml.DTSERVER format_datetime(self.dtserver)
-              xml.LANGUAGE "ENG"
+              xml.LANGUAGE 'ENG'
               xml.FI {
                 xml.ORG self.fi_org
                 xml.FID self.fi_fid
               }
-              xml.send "INTU.BID", self.fi_fid
+              xml.send 'INTU.BID', self.fi_fid
             }
           }
           xml.BANKMSGSRSV1 {
             xml.STMTTRNRS {
-              xml.TRNUID "0"
+              xml.TRNUID '0'
               xml.STATUS {
-                xml.CODE "0"
-                xml.SEVERITY "INFO"
+                xml.CODE '0'
+                xml.SEVERITY 'INFO'
               }
               xml.STMTRS {
-                xml.CURDEF "USD"
+                xml.CURDEF 'USD'
                 xml.BANKACCTFROM {
                   xml.BANKID self.bank_id
                   xml.ACCTID self.acct_id
@@ -126,11 +126,11 @@ module OFX
     end
 
     def format_datetime(time)
-      time.strftime("%Y%m%d000000")
+      time.strftime('%Y%m%d000000')
     end
 
     def format_date(time)
-      time.strftime("%Y%m%d")
+      time.strftime('%Y%m%d')
     end
 
     def format_amount(amount)
@@ -143,9 +143,9 @@ module OFX
 
     def format_trntype(amount)
       if amount > 0
-        "CREDIT"
+        'CREDIT'
       else
-        "DEBIT"
+        'DEBIT'
       end
     end
 

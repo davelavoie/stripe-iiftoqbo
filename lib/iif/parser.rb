@@ -54,11 +54,11 @@ module IIF
       entry.type = fields[0]
       
       fields[1..-1].each_with_index do |field, idx|
-        entry.send(definition[idx] + "=", field)
+        entry.send(definition[idx] + '=', field)
       end
 
       entry.amount = BigDecimal.new(entry.amount) if entry.amount
-      entry.date = Date.strptime(entry.date, "%m/%d/%Y") if entry.date
+      entry.date = Date.strptime(entry.date, '%m/%d/%Y') if entry.date
 
       @entries.push(entry)
     end
@@ -71,7 +71,7 @@ module IIF
         
         case entry.type
 
-        when "TRNS"
+        when 'TRNS'
           if in_transaction
             @transactions.push(transaction)
             in_transaction = false
@@ -79,7 +79,7 @@ module IIF
           transaction = Transaction.new
           in_transaction = true
           
-        when "ENDTRNS"
+        when 'ENDTRNS'
           @transactions.push(transaction)
           in_transaction = false
 

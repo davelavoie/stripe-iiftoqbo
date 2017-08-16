@@ -28,15 +28,15 @@ IIF_FILE     : the .iif file to convert (required)
 
 EOS
   
-  opts.on('-p', '--payments [PAYMENTS_CSV_FILE]', "Populate .qbo charge memo using memo field from a Stripe Payments CSV export") do |filename|
+  opts.on('-p', '--payments [PAYMENTS_CSV_FILE]', 'Populate .qbo charge memo using memo field from a Stripe Payments CSV export') do |filename|
     payments_file = filename
   end
 
-  opts.on('-t', '--transfers [TRANSFERS_CSV_FILE]', "Populate .qbo transfer memo using memo field from a Stripe Transfers CSV export") do |filename|
+  opts.on('-t', '--transfers [TRANSFERS_CSV_FILE]', 'Populate .qbo transfer memo using memo field from a Stripe Transfers CSV export') do |filename|
     transfers_file = filename
   end
 
-  opts.on('-c', '--csv', "Output CSV of transactions instead of QBO, for debugging and analysis") do 
+  opts.on('-c', '--csv', 'Output CSV of transactions instead of QBO, for debugging and analysis') do
     dump_csv = true
   end
 end
