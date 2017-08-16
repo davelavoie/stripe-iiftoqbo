@@ -130,7 +130,10 @@ module StripeIIFToQBO
         when 'Stripe Account'
           return nil
       end
-
+      if ofx_entry[:amount] == BigDecimal.new(0)
+        #bail on zero amounts
+        return nil
+      end
       return ofx_entry
     end
 
