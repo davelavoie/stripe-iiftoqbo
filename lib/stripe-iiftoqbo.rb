@@ -14,12 +14,11 @@ module StripeIIFToQBO
       @transfers_file = options[:transfers_file] if options[:transfers_file]
       @server_time = options[:server_time] || Date.today
       @output_file = options[:output_file] if options[:output_file]
-      @alt_entries = options[:alt_entries] if options[:alt_entries]
       raise 'missing required iif file' if @iif_file.nil?
       raise 'missing required output file' if @output_file.nil?
       load_payments_file(@payments_file)
       load_transfers_file(@transfers_file)
-      load_iif_file(@iif_file, @alt_entries)
+      load_iif_file(@iif_file)
     end
 
     def load_payments_file(payments_file)
@@ -42,7 +41,7 @@ module StripeIIFToQBO
       end
     end
 
-    def load_iif_file(iif_file, return_alt_entries = false)
+    def load_iif_file(iif_file)
       @ofx_entries = []
       file_count = 0
       if iif_file
@@ -50,7 +49,7 @@ module StripeIIFToQBO
           iif.transactions.each do |transaction|
             #process the transaction
             transaction.entries.each do |iif_entry|
-              ofx_entry = convert_iif_entry_to_ofx(iif_entry, return_alt_entries)
+              ofx_entry = convert_iif_entry_to_ofx(iif_entry)
               if ofx_entry
                 @ofx_entries.push(ofx_entry)
               end
@@ -68,14 +67,13 @@ module StripeIIFToQBO
       end
     end
 
-    def convert_iif_entry_to_ofx(iif_entry, return_alt_entries = false)
+    def convert_iif_entry_to_ofx(iif_entry)
       ofx_entry = {}
       ofx_entry[:date] = iif_entry.date
       ofx_entry[:fitid] = iif_entry.memo
       ofx_entry[:accnt] = iif_entry.accnt
       ofx_entry[:trnstype] = iif_entry.trnstype
       ofx_entry[:memo] = iif_entry.memo
-      alt_entry = false
       case iif_entry.accnt
         when 'Stripe Third-party Account'
           ofx_entry[:amount] = -iif_entry.amount
@@ -116,31 +114,18 @@ module StripeIIFToQBO
           if @payments[charge_id]
             ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
           end
-        when 'Stripe Account'
-          #unnecessary
-          return nil
         when 'Stripe Other Income'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = 'Other Income'
-          alt_entry = true
+        when 'Stripe Account'
+          #unnecessary
+          return nil
       end
       if ofx_entry[:amount] == BigDecimal.new(0)
         #bail on zero amounts
         return nil
       end
-      if alt_entry
-        if return_alt_entries
-          return ofx_entry
-        else
-          return nil
-        end
-      else
-        if return_alt_entries
-          return nil
-        else
-          return ofx_entry
-        end
-      end
+      ofx_entry
     end
 
     def to_csv

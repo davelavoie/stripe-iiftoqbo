@@ -9,7 +9,6 @@ account_id = nil
 iif_file = nil
 output_file = nil
 dump_csv = false
-alt_entries = false
 payments_file = nil
 transfers_file = nil
 optparser = OptionParser.new do |opts|
@@ -36,9 +35,6 @@ OUTPUT_FILE     : the filename for .qbo output, excluding file extension (requir
   opts.on('-c', '--csv', 'Output CSV of transactions instead of QBO, for debugging and analysis') do
     dump_csv = true
   end
-  opts.on('-a', '--alt', 'Return alternate entries') do
-    alt_entries = true
-  end
 end
 optparser.parse!
 if ARGV.length < 3
@@ -49,6 +45,5 @@ StripeIIFToQBO::Converter.new(:account_id => ARGV[0],
                               :iif_file => ARGV[1],
                               :output_file => ARGV[2],
                               :payments_file => payments_file,
-                              :transfers_file => transfers_file,
-                              :alt_entries => alt_entries)
+                              :transfers_file => transfers_file)
 puts 'done!'
