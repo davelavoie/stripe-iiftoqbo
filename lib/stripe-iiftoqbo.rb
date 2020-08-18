@@ -25,9 +25,16 @@ module StripeIIFToQBO
       @payments = {}
 
       if payments_file
-        CSV.foreach(payments_file, :headers => true, :encoding => 'windows-1251:utf-8') do |row|
-          @payments[row['id']] = row['Description'] || ''
-        end
+		CSV.foreach(payments_file, :headers => true, :encoding => 'windows-1251:utf-8') do |row|
+			# when exporting CSV from https://dashboard.stripe.com/payments (unified payments)
+			if row['id']
+		  		@payments[row['id']] = "[" + ( row['Currency'] || '???' ) + "] " + ( row['Description'] || '' ) + " {" + ( row['Customer Email'] || '' )  + "} " + ( row['Card Name'] || '' ) + " | " + ( row['Customer ID'] || '' ) + " | "
+			end
+			# when exporting CSV from https://dashboard.stripe.com/balance
+			if row['Source']
+				@payments[row['Source']] = "[" + ( row['Currency'] || '???' ) + "] " + ( row['Description'] || '' ) + " | " + ( row['id'] || '' ) + " | "
+			end
+		end
       end
     end
 
@@ -35,8 +42,19 @@ module StripeIIFToQBO
       @transfers = {}
 
       if transfers_file
-        CSV.foreach(transfers_file, :headers => true, :encoding => 'windows-1251:utf-8') do |row|
-          @transfers[row['ID']] = row['Description'] || ''
+		CSV.foreach(transfers_file, :headers => true, :encoding => 'windows-1251:utf-8') do |row|
+			# when exporting CSV from https://dashboard.stripe.com/payouts
+			if row['id']
+		  		@transfers[row['id']] = "[" + ( row['Currency'] || '???' ) + "] " + " | " + ( row['Destination'] || '' ) + " | " + ( row['Balance Transaction'] || '' )
+			end
+			# when exporting CSV from https://dashboard.stripe.com/balance
+			if row['Source']
+				@transfers[row['Source']] = "[" + ( row['Currency'] || '???' ) + "] " + ( row['id'] || '' )
+			end
+			# default behavior, unknown use
+			if row['ID']
+				@transfers[row['ID']] = row['Description'] || ''
+			end
         end
       end
     end
@@ -59,7 +77,7 @@ module StripeIIFToQBO
               write_qbo_file(file_count)
               file_count += 1
               @ofx_entries = []
-            end
+			end
           end
         end
         #write file (anything left)
@@ -74,6 +92,7 @@ module StripeIIFToQBO
       ofx_entry[:accnt] = iif_entry.accnt
       ofx_entry[:trnstype] = iif_entry.trnstype
       ofx_entry[:memo] = iif_entry.memo
+      ofx_entry[:currency] = "usd"
       case iif_entry.accnt
         when 'Stripe Third-party Account'
           ofx_entry[:amount] = -iif_entry.amount
@@ -81,14 +100,31 @@ module StripeIIFToQBO
           ofx_entry[:memo] =~ /Transfer from Stripe: (\S+)/
           transfer_id = $1
           if @transfers[transfer_id]
-            ofx_entry[:memo] = "#{@transfers[transfer_id]} #{iif_entry.memo}"
+            ofx_entry[:memo] = "#{@transfers[transfer_id]} | #{iif_entry.memo}"
           end
-        when 'Stripe Payment Processing Fees'
+		when 'Stripe Checking Account'
+          ofx_entry[:memo] =~ /Transfer ID: (\S+)/
+		  transfer_id = $1
+		  ofx_entry[:trnstype] = "XFER"
           ofx_entry[:amount] = -iif_entry.amount
-          ofx_entry[:name] = 'Stripe'
-        when 'Stripe Checking Account'
+		  ofx_entry[:name] = "Transfer to #{iif_entry.accnt}"
+		  if @transfers[transfer_id]
+			ofx_entry[:memo] = "#{@transfers[transfer_id]} | #{iif_entry.memo}"
+			ofx_entry[:currency] = @transfers[transfer_id].split("[").last.split("]").first
+		  end
+		when 'Stripe Payment Processing Fees'
+          ofx_entry[:memo] =~ /Fees for charge ID: (\S+)/
+		  charge_id = $1
           ofx_entry[:amount] = -iif_entry.amount
-          ofx_entry[:name] = "Transfer to #{iif_entry.accnt}"
+		  ofx_entry[:name] = 'Stripe'
+		  ofx_entry[:trnstype] = "FEE"
+          if @payments[charge_id]
+            ofx_entry[:memo] = ofx_entry[:memo] + " | Processing Fees \n " + "#{@payments[charge_id]}"
+			ofx_entry[:fitid] = charge_id
+			ofx_entry[:currency] = @payments[charge_id].split("[").last.split("]").first
+		    ofx_entry[:name] = "Stripe (#{ofx_entry[:currency].upcase})"
+
+          end
         when 'Stripe Sales'
           ofx_entry[:amount] = -iif_entry.amount
           if iif_entry.memo =~ /Stripe Connect fee/
@@ -101,8 +137,11 @@ module StripeIIFToQBO
           ofx_entry[:memo] =~ /Charge ID: (\S+)/
           charge_id = $1
           if @payments[charge_id]
-            ofx_entry[:memo] = "#{@payments[charge_id]} Charge ID: #{charge_id}"
-            ofx_entry[:fitid] = charge_id
+            ofx_entry[:memo] = ofx_entry[:memo] + " \n " + "#{@payments[charge_id]}"
+			ofx_entry[:fitid] = charge_id
+			ofx_entry[:currency] = @payments[charge_id].split("[").last.split("]").first
+            ofx_entry[:name] = @payments[charge_id].split("{").last.split("}").first
+
           end
         when 'Stripe Returns'
           ofx_entry[:amount] = -iif_entry.amount
@@ -112,7 +151,8 @@ module StripeIIFToQBO
           charge_id = $1
 
           if @payments[charge_id]
-            ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
+			ofx_entry[:memo] = "#{@payments[charge_id]} Refund of Charge ID: #{charge_id}"
+			ofx_entry[:currency] = @payments[charge_id].split("[").last.split("]").first
           end
         when 'Stripe Other Income'
           ofx_entry[:amount] = -iif_entry.amount
@@ -121,7 +161,7 @@ module StripeIIFToQBO
           #unnecessary
           return nil
       end
-      if ofx_entry[:amount] == BigDecimal.new(0)
+      if ofx_entry[:amount] == BigDecimal(0)
         #bail on zero amounts
         return nil
       end
@@ -167,6 +207,8 @@ module StripeIIFToQBO
       @ofx_entries.each do |ofx_entry|
         ofx_builder.transaction do |ofx_tr|
           ofx_tr.dtposted = ofx_entry[:date]
+          ofx_tr.trntype = ofx_entry[:trnstype]
+          ofx_tr.currency = ofx_entry[:currency]
           ofx_tr.trnamt = ofx_entry[:amount]
           ofx_tr.fitid = ofx_entry[:fitid]
           ofx_tr.name = ofx_entry[:name]
