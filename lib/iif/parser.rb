@@ -57,7 +57,7 @@ module IIF
         entry.send(definition[idx] + '=', field)
       end
 
-      entry.amount = BigDecimal.new(entry.amount) if entry.amount
+      entry.amount = BigDecimal(entry.amount) if entry.amount
       entry.date = Date.strptime(entry.date, '%m/%d/%Y') if entry.date
 
       @entries.push(entry)

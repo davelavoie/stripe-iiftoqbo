@@ -41,7 +41,7 @@ module OFX
     end
 
     def bal_amt=(amt)
-      @bal_amt = BigDecimal.new(amt)
+      @bal_amt = BigDecimal(amt)
     end
 
     def transaction(&block)
@@ -98,9 +98,10 @@ module OFX
                   if self.dtend
                     xml.DTEND format_date(self.dtend)
                   end
-                  self.transactions.each do |transaction|
+				  self.transactions.each do |transaction|
                     xml.STMTTRN {
-                      xml.TRNTYPE format_trntype(transaction.trnamt)
+                      xml.TRNTYPE format_trntype(transaction)
+                #      xml.CURRENCY transaction.currency
                       xml.DTPOSTED format_date(transaction.dtposted)
                       xml.TRNAMT format_amount(transaction.trnamt)
                       xml.FITID transaction.fitid
@@ -141,12 +142,16 @@ module OFX
       end
     end
 
-    def format_trntype(amount)
-      if amount > 0
-        'CREDIT'
-      else
-        'DEBIT'
-      end
+	def format_trntype(transaction)
+	 	if transaction.trntype == "GENERAL JOURNAL"
+			if transaction.trnamt > 0
+				'CREDIT'
+			else
+				'DEBIT'
+			end
+		else
+			transaction.trntype
+		end
     end
 
     def format_balance(balance)
