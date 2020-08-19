@@ -17,6 +17,7 @@ module OFX
     attr_accessor :dtend
 
     attr_accessor :transactions
+    attr_accessor :currencies
 
     attr_accessor :bal_amt
     attr_accessor :dtasof
@@ -32,8 +33,9 @@ module OFX
           ['COMPRESSION', 'NONE'],
           ['OLDFILEUID', 'NONE'],
           ['NEWFILEUID', 'NONE']
-      ]
-      @transactions = []
+	  ]
+	  @currencies = []
+	  @transactions = []
       self.dtserver = Date.today
       if block_given?
         yield self
@@ -44,13 +46,15 @@ module OFX
       @bal_amt = BigDecimal(amt)
     end
 
-    def transaction(&block)
-      transaction = OFX::Transaction.new
-      yield transaction
-      self.transactions.push transaction
+	def transaction(&block)
+	  transaction = OFX::Transaction.new
+	  yield transaction
+	  self.currencies.push transaction.currency
+	  self.transactions.push transaction
     end
 
-    def to_ofx
+	def to_ofx
+	  self.currencies = self.currencies.uniq
       print_headers +
           print_body
     end
@@ -78,48 +82,51 @@ module OFX
             }
           }
           xml.BANKMSGSRSV1 {
-            xml.STMTTRNRS {
-              xml.TRNUID '0'
-              xml.STATUS {
-                xml.CODE '0'
-                xml.SEVERITY 'INFO'
-              }
-              xml.STMTRS {
-                xml.CURDEF 'USD'
-                xml.BANKACCTFROM {
-                  xml.BANKID self.bank_id
-                  xml.ACCTID self.acct_id
-                  xml.ACCTTYPE self.acct_type
-                }
-                xml.BANKTRANLIST {
-                  if self.dtstart
-                    xml.DTSTART format_date(self.dtstart)
-                  end
-                  if self.dtend
-                    xml.DTEND format_date(self.dtend)
-                  end
-				  self.transactions.each do |transaction|
-                    xml.STMTTRN {
-                      xml.TRNTYPE format_trntype(transaction)
-                #      xml.CURRENCY transaction.currency
-                      xml.DTPOSTED format_date(transaction.dtposted)
-                      xml.TRNAMT format_amount(transaction.trnamt)
-                      xml.FITID transaction.fitid
-                      xml.NAME transaction.name
-                      xml.MEMO transaction.memo
-                    }
-                  end
-                }
-                xml.LEDGERBAL {
-                  if self.bal_amt
-                    xml.BALAMT format_balance(self.bal_amt)
-                  end
-                  if self.dtasof
-                    xml.DTASOF format_date(self.dtasof)
-                  end
-                }
-              }
-            }
+			self.currencies.each do |currency|
+				xml.STMTTRNRS {
+					xml.TRNUID '0'
+					xml.STATUS {
+						xml.CODE '0'
+						xml.SEVERITY 'INFO'
+					}
+					xml.STMTRS {
+						xml.CURDEF currency
+						xml.BANKACCTFROM {
+						xml.BANKID self.bank_id
+						xml.ACCTID self.acct_id + " (#{currency})"
+						xml.ACCTTYPE self.acct_type
+						}
+						xml.BANKTRANLIST {
+						if self.dtstart
+							xml.DTSTART format_date(self.dtstart)
+						end
+						if self.dtend
+							xml.DTEND format_date(self.dtend)
+						end
+						self.transactions.each do |transaction|
+							if transaction.currency == currency
+								xml.STMTTRN {
+								xml.TRNTYPE format_trntype(transaction)
+								xml.DTPOSTED format_date(transaction.dtposted)
+								xml.TRNAMT format_amount(transaction.trnamt)
+								xml.FITID transaction.fitid
+								xml.NAME transaction.name
+								xml.MEMO transaction.memo
+								}
+							end
+						end
+						}
+						xml.LEDGERBAL {
+						if self.bal_amt
+							xml.BALAMT format_balance(self.bal_amt)
+						end
+						if self.dtasof
+							xml.DTASOF format_date(self.dtasof)
+						end
+						}
+					}
+				}
+			end
           }
         }
       end

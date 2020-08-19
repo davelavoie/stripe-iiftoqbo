@@ -1,5 +1,11 @@
 ## Stripe IIF to QuickBooks Online QBO File Translator
 
+NOTE: This forked version works differently than the other versions:
+
+* Transactions with different currencies will be assigned to distinct accounts, but in order to make it possible, you must absolutely use the payments and transfers CSV files (see below). 
+* When you'll import the .qbo file into QuickBooks, you'll be asked to assign the transactions to one or more accounts, based on the number of currencies found in the CSV files. By default, transactions are assigned to the USD currency.
+* Other changes with this version include the categorization of transaction types: Stripe transaction fees will be assigned to the "FEE" transaction type, while transfer will be assigned to the "XFER" type.
+
 Does your company use Stripe to charge credit cards?
 
 Does your company use QuickBooks Online for accounting?
@@ -52,7 +58,7 @@ Pick a name for your company (e.g. MyCompanyName). It's going to be saved into t
 
 Then, run the app:
 
-	ruby -Ilib bin/stripe-iiftoqbo MyCompanyName balance_history.iif > balance_history.qbo
+	ruby -Ilib bin/stripe-iiftoqbo MyCompanyName balance_history.iif balance_history.qbo
 
 You'll get a nice .QBO file with all of your transactions.
 
@@ -75,14 +81,19 @@ You should see a line item for each:
 
 Categorize and accept each transaction. Now you can see how much you made, how much you paid to Stripe, and how much you paid to your vendors.
 
+In order to split transactions to different accounts based on their currency, you must absolutely use CSV files in order to map the currency used for each transaction, so you'll need to run the following:
+
+	ruby -Ilib bin/stripe-iiftoqbo -p payments.csv -t transfers.csv MyCompanyName balance_history.iif balance_history.qbo
+
+
 ## Extras
 
 If you want to merge the description for each payment into the 'memo' field of your QBO file so you can see them in QuickBooks, go to the Stripe Payments page and export your payments as a CSV. It'll look like this:
 
 	$ head payments.csv
 	id,Description,Created,Amount,Amount Refunded,Currency,Converted Amount,Converted Amount Refunded,Fee,Converted Currency,Mode,Status,Customer ID,Customer Description,Customer Email,Captured,Card Last4,Card Type,Card Exp Month,Card Exp Year,Card Name,Card Address Line1,Card Address Line2,Card Address City,Card Address State,Card Address Country,Card Address Zip,Card Issue Country,Card Fingerprint,Card CVC Status,Card AVS Zip Status,Card AVS Line1 Status,Dispute Status
-	ch_3QSlijsVumgdnQ,,2014-02-03 01:47,19.00,0.00,usd,19.00,0.00,0.85,usd,Live,Paid,cus_29a92b191,test@test.com,,true,1111,Visa,1,2016,,,,,,,,US,ztg6Hv5g3sbjBE57,,,,
-	ch_3PimG0oAu3LRSg,Test Description To Merge,2014-02-01 02:16,249.00,0.00,usd,249.00,0.00,7.52,usd,Live,Paid,cus_292ab3c2b,test@test.com,,true,2222,Visa,1,2016,,,,,,,,US,2Xv5QDDhdKj23Z0l,,,,
+	ch_3QSlijsVumgdnQ,,2020-02-03 01:47,19.00,0.00,usd,19.00,0.00,0.85,usd,Live,Paid,cus_29a92b191,test@test.com,,true,1111,Visa,1,2016,,,,,,,,US,ztg6Hv5g3sbjBE57,,,,
+	ch_3PimG0oAu3LRSg,Test Description To Merge,2020-02-01 02:16,249.00,0.00,usd,249.00,0.00,7.52,usd,Live,Paid,cus_292ab3c2b,test@test.com,,true,2222,Visa,1,2016,,,,,,,,US,2Xv5QDDhdKj23Z0l,,,,
 
 Then, run the tool again with ```-p payments.csv```. For each charge in the IIF, if there's a matching Charge ID in the payments file, the tool will merge it into the QBO memo.
 

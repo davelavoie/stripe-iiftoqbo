@@ -28,7 +28,7 @@ module StripeIIFToQBO
 		CSV.foreach(payments_file, :headers => true, :encoding => 'windows-1251:utf-8') do |row|
 			# when exporting CSV from https://dashboard.stripe.com/payments (unified payments)
 			if row['id']
-		  		@payments[row['id']] = "[" + ( row['Currency'] || '???' ) + "] " + ( row['Description'] || '' ) + " {" + ( row['Customer Email'] || '' )  + "} " + ( row['Card Name'] || '' ) + " | " + ( row['Customer ID'] || '' ) + " | "
+		  		@payments[row['id']] = "[" + ( row['Currency'] || '???' ) + "] " + ( row['Description'] || '' ) + " {" + ( row['Card Name'] || '' )  + "} " + ( row['Customer Email'] || '' ) + " | " + ( row['Customer ID'] || '' ) + " | " + ( row['Card Address State'] || '' )
 			end
 			# when exporting CSV from https://dashboard.stripe.com/balance
 			if row['Source']
@@ -108,6 +108,7 @@ module StripeIIFToQBO
 		  ofx_entry[:trnstype] = "XFER"
           ofx_entry[:amount] = -iif_entry.amount
 		  ofx_entry[:name] = "Transfer to #{iif_entry.accnt}"
+		  ofx_entry[:currency] = "usd"
 		  if @transfers[transfer_id]
 			ofx_entry[:memo] = "#{@transfers[transfer_id]} | #{iif_entry.memo}"
 			ofx_entry[:currency] = @transfers[transfer_id].split("[").last.split("]").first
@@ -118,6 +119,7 @@ module StripeIIFToQBO
           ofx_entry[:amount] = -iif_entry.amount
 		  ofx_entry[:name] = 'Stripe'
 		  ofx_entry[:trnstype] = "FEE"
+		  ofx_entry[:currency] = "usd"
           if @payments[charge_id]
             ofx_entry[:memo] = ofx_entry[:memo] + " | Processing Fees \n " + "#{@payments[charge_id]}"
 			ofx_entry[:fitid] = charge_id
@@ -135,9 +137,10 @@ module StripeIIFToQBO
             ofx_entry[:name] = iif_entry.accnt
           end
           ofx_entry[:memo] =~ /Charge ID: (\S+)/
-          charge_id = $1
+		  charge_id = $1
+		  ofx_entry[:currency] = "usd"
           if @payments[charge_id]
-            ofx_entry[:memo] = ofx_entry[:memo] + " \n " + "#{@payments[charge_id]}"
+            ofx_entry[:memo] = "#{@payments[charge_id]}" + " \n " + ofx_entry[:memo] 
 			ofx_entry[:fitid] = charge_id
 			ofx_entry[:currency] = @payments[charge_id].split("[").last.split("]").first
             ofx_entry[:name] = @payments[charge_id].split("{").last.split("}").first
@@ -146,7 +149,7 @@ module StripeIIFToQBO
         when 'Stripe Returns'
           ofx_entry[:amount] = -iif_entry.amount
           ofx_entry[:name] = 'Credit Card Refund'
-
+		  ofx_entry[:currency] = "usd"
           ofx_entry[:memo] =~ /Refund of charge (\S+)/
           charge_id = $1
 
@@ -204,7 +207,7 @@ module StripeIIFToQBO
         ofx.dtasof = max_date
       end
 
-      @ofx_entries.each do |ofx_entry|
+	  @ofx_entries.each do |ofx_entry|
         ofx_builder.transaction do |ofx_tr|
           ofx_tr.dtposted = ofx_entry[:date]
           ofx_tr.trntype = ofx_entry[:trnstype]
